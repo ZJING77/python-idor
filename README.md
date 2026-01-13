@@ -71,6 +71,19 @@ python main.py \
 - `--api-key`: 指定API密钥 (覆盖配置文件和环境变量)
 - `--base-url`: 指定API基础URL (覆盖配置文件和环境变量)
 
+# 新增大模型的切换
+  python3 main.py --project /path/to/java/project --find-all-sources
+
+  # 使用OpenAI
+  python3 main.py --project /path/to/java/project --model-type openai --model gpt-4-turbo
+
+  # 使用Anthropic
+  python3 main.py --project /path/to/java/project --model-type anthropic --model claude-3-sonnet
+
+  # 使用Gemini
+  python3 main.py --project /path/to/java/project --model-type gemini --model gemini-pro
+
+
 ## 核心组件
 
 ### 1. Agents
