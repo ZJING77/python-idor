@@ -72,7 +72,7 @@ python main.py \
 - `--base-url`: 指定API基础URL (覆盖配置文件和环境变量)
 
 # 新增大模型的切换
-  python3 main.py --project /path/to/java/project --find-all-sources
+  python3 main.py --project /path/to/java/project --find-all-sources //默认使用qwen3
 
   # 使用OpenAI
   python3 main.py --project /path/to/java/project --model-type openai --model gpt-4-turbo
