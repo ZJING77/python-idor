@@ -1,5 +1,25 @@
 {
-  "api_key": "sk-",
-  "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-  "model": "qwen3-max-2025-09-23"
+  "default_model_type": "dashscope",
+  "models": {
+    "dashscope": {
+      "api_key": "sk-",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen3-max-2025-09-23"
+    },
+    "openai": {
+      "api_key": "sk-",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4-turbo-preview"
+    },
+    "anthropic": {
+      "api_key": "sk-ant-",
+      "base_url": "https://api.anthropic.com/v1",
+      "model": "claude-3-sonnet-20240229"
+    },
+    "gemini": {
+      "api_key": "sk-gem-",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "model": "gemini-pro"
+    }
+  }
 }
