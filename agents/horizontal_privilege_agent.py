@@ -10,14 +10,11 @@ from tools.source_locator import SourceLocator
 from tools.call_graph_analyzer import CallGraphAnalyzer
 import os
 from pathlib import Path
-from models import ModelAdapterFactory
-from models.base_adapter import ModelAdapter
 
 class HorizontalPrivilegeAgent:
     def __init__(self,
                  project_path: str,
                  model: str = "qwen3-max",
-                 model_type: str = "dashscope",
                  api_key: str = None,
                  base_url: str = None):
         """
@@ -26,24 +23,17 @@ class HorizontalPrivilegeAgent:
         Args:
             project_path: 项目根路径
             model: 使用的模型名称
-            model_type: 模型类型 ('dashscope', 'openai', 'anthropic', 'gemini')
             api_key: API密钥
             base_url: API基础URL
         """
         self.project_path = project_path
         self.model = model
-        self.model_type = model_type
 
         # 设置API客户端
         if api_key:
             openai.api_key = api_key
         if base_url:
             openai.base_url = base_url
-
-        # 创建模型适配器
-        self.model_adapter: ModelAdapter = ModelAdapterFactory.create_adapter(
-            model_type, api_key, base_url, model
-        )
 
         # 初始化工具
         self.code_analyzer = CodeAnalyzer(project_path)
@@ -94,32 +84,23 @@ class HorizontalPrivilegeAgent:
             # 5. 调用LLM进行分析
             print("🤖 调用LLM进行深度分析...")
             try:
-                # 使用模型适配器进行API调用
-                headers = self.model_adapter.get_headers()
+                # 使用requests进行API调用，以兼容DashScope
+                url = f"{openai.base_url.rstrip('/')}/chat/completions" if hasattr(openai, 'base_url') else "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 
-                # 准备请求数据
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
+                headers = {
+                    'Authorization': f'Bearer {openai.api_key}',
+                    'Content-Type': 'application/json'
+                }
 
-                data = self.model_adapter.prepare_request_payload(
-                    messages,
-                    temperature=0.1,
-                    response_format={"type": "json_object"}
-                )
-
-                # 处理Gemini等特殊模型的API URL
-                if self.model_type == 'gemini':
-                    # Gemini的API URL格式不同，包含API密钥
-                    from models.gemini_adapter import GeminiAdapter
-                    adapter = self.model_adapter
-                    if isinstance(adapter, GeminiAdapter):
-                        url = adapter.get_full_url()
-                    else:
-                        url = f"{self.model_adapter.base_url.rstrip('/')}/chat/completions"
-                else:
-                    url = f"{self.model_adapter.base_url.rstrip('/')}/chat/completions"
+                data = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "temperature": 0.1,
+                    "response_format": {"type": "json_object"}
+                }
 
                 response = requests.post(url, headers=headers, json=data)
 
@@ -127,14 +108,13 @@ class HorizontalPrivilegeAgent:
                     raise Exception(f"API请求失败，状态码: {response.status_code}, 响应: {response.text}")
 
                 response_data = response.json()
-                analysis_result = self.model_adapter.extract_response_content(response_data)
+                analysis_result = response_data["choices"][0]["message"]["content"]
             except Exception as e:
                 import traceback
                 print(f"❌ API调用失败: {str(e)}")
                 print(f"📋 详细错误信息: {traceback.format_exc()}")
                 print(f"🔧 模型: {self.model}")
-                print(f"🔧 模型类型: {self.model_type}")
-                print(f"🔧 基础URL: {self.model_adapter.base_url if hasattr(self.model_adapter, 'base_url') else '未设置'}")
+                print(f"🔧 基础URL: {openai.base_url if hasattr(openai, 'base_url') else '未设置'}")
                 return {
                     "has_vulnerability": False,
                     "reason": "API调用失败",
