@@ -9,18 +9,19 @@ from typing import List, Dict, Any
 
 
 class AnalysisService:
-    def __init__(self, project_path: str, model: str = "qwen3-max", api_key: str = None, base_url: str = None):
+    def __init__(self, project_path: str, model: str = "qwen3-max", model_type: str = "dashscope", api_key: str = None, base_url: str = None):
         """
         初始化分析服务
 
         Args:
             project_path: 项目路径
             model: 使用的模型
+            model_type: 模型类型 ('dashscope', 'openai', 'anthropic', 'gemini')
             api_key: API密钥
             base_url: API基础URL
         """
         self.project_path = project_path
-        self.agent = HorizontalPrivilegeAgent(project_path, model, api_key, base_url)
+        self.agent = HorizontalPrivilegeAgent(project_path, model, model_type, api_key, base_url)
         self.source_locator = SourceLocator(project_path)
 
     def analyze_all_sources_in_project(self, source_annotations: List[str] = None) -> List[Dict[str, Any]]:
