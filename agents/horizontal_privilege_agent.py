@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 from models import ModelAdapterFactory
 from models.base_adapter import ModelAdapter
+import concurrent.futures
+import threading
 
 class HorizontalPrivilegeAgent:
     def __init__(self,
@@ -239,35 +241,77 @@ class HorizontalPrivilegeAgent:
         prompt_path = Path(__file__).parent.parent / "prompts" / "horizontal_privilege_escalation_v10.md"
         return prompt_path.read_text(encoding="utf-8")
 
-    def analyze_sources(self, sources_list: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    def analyze_sources(self, sources_list: List[Dict[str, str]], max_workers: int = 3) -> List[Dict[str, Any]]:
         """
-        批量分析多个源点
+        多线程批量分析多个源点
 
         Args:
             sources_list: 源点信息列表, 格式: [{"class_fqn": "...", "method_name": "..."}]
+            max_workers: 最大线程数，默认为3（避免API调用过于频繁）
 
         Returns:
             分析结果列表
         """
-        results = []
+        if not sources_list:
+            return []
+
         total = len(sources_list)
-        print(f"📊 开始批量分析 {total} 个方法")
+        print(f"📊 开始批量分析 {total} 个方法 (使用 {max_workers} 个线程)")
 
-        for idx, source in enumerate(sources_list, 1):
-            print(f"({idx}/{total}) 正在分析 {source['class_fqn']}#{source['method_name']}")
-            result = self.analyze_method(
-                source['class_fqn'],
-                source['method_name']
-            )
-            result['source_class'] = source['class_fqn']
-            result['source_method'] = source['method_name']
-            results.append(result)
+        # 创建新的适配器实例用于多线程
+        # 每个线程需要独立的消息队列和请求参数，这里复用model_adapter是线程安全的
+        results = []
 
-            # 简单的进度提示
-            vulnerability_status = "⚠️ 漏洞" if result.get('has_vulnerability') else "✅ 安全"
-            print(f"    → {vulnerability_status} (置信度: {result.get('detection_confidence', 0)/10})")
+        # 使用ThreadPoolExecutor进行多线程执行
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任务并获取Future对象
+            future_to_source = {
+                executor.submit(self._analyze_method_with_params,
+                              source['class_fqn'],
+                              source['method_name']): source
+                for source in sources_list
+            }
+
+            # 按完成顺序处理结果
+            completed = 0
+            for future in concurrent.futures.as_completed(future_to_source):
+                source = future_to_source[future]
+                completed += 1
+
+                try:
+                    result = future.result()
+                    result['source_class'] = source['class_fqn']
+                    result['source_method'] = source['method_name']
+                    results.append(result)
+
+                    # 更新进度提示
+                    vulnerability_status = "⚠️ 漏洞" if result.get('has_vulnerability') else "✅ 安全"
+                    print(f"({completed}/{total}) {source['class_fqn']}#{source['method_name']} → {vulnerability_status} (置信度: {result.get('detection_confidence', 0)/10})")
+
+                except Exception as e:
+                    print(f"({completed}/{total}) 分析 {source['class_fqn']}#{source['method_name']} 时出现错误: {e}")
+                    error_result = {
+                        'source_class': source['class_fqn'],
+                        'source_method': source['method_name'],
+                        'has_vulnerability': False,
+                        'error': f"分析错误: {str(e)}"
+                    }
+                    results.append(error_result)
 
         return results
+
+    def _analyze_method_with_params(self, class_fqn: str, method_name: str) -> Dict[str, Any]:
+        """
+        包装方法以确保可以在多线程环境中调用
+
+        Args:
+            class_fqn: 类的完全限定名
+            method_name: 方法名
+
+        Returns:
+            分析结果
+        """
+        return self.analyze_method(class_fqn, method_name)
 
     def get_tool_call_result(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """

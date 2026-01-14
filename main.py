@@ -83,6 +83,7 @@ def main():
     parser.add_argument("--find-all-sources", action="store_true", help="查找并分析所有潜在的源点")
     parser.add_argument("--output", default="results.json", help="输出文件路径，例如 /tmp/results.json")
     parser.add_argument("--config", default="config.json", help="配置文件路径，默认为 config.json")
+    parser.add_argument("--max-workers", type=int, default=3, help="最大并发线程数（默认为3，避免API调用过于频繁）")
 
     args = parser.parse_args()
 
@@ -159,21 +160,14 @@ def main():
 
     elif args.find_all_sources:
         # 查找并分析所有源点
-        print("🔍 搜索项目中所有潜在的用户输入源点...")
-        source_methods = service.find_user_controllable_sources()
-        print(f"📊 找到 {len(source_methods)} 个潜在源点")
-
-        if source_methods:
-            print("⏳ 开始批量分析...")
-            results = service.agent.analyze_sources(source_methods)
-        else:
-            print("⚠️ 未找到任何源点")
+        results = service.analyze_user_controllable_sources(max_workers=args.max_workers)
+        if not results:
             return
 
     else:
         # 默认：分析所有带Web注解的方法
         print("🔍 分析项目中所有Web入口方法...")
-        results = service.analyze_all_sources_in_project()
+        results = service.analyze_all_sources_in_project(max_workers=args.max_workers)
 
     # 保存结果
     with open(args.output, 'w', encoding='utf-8') as f:

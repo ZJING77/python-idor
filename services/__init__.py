@@ -24,12 +24,13 @@ class AnalysisService:
         self.agent = HorizontalPrivilegeAgent(project_path, model, model_type, api_key, base_url)
         self.source_locator = SourceLocator(project_path)
 
-    def analyze_all_sources_in_project(self, source_annotations: List[str] = None) -> List[Dict[str, Any]]:
+    def analyze_all_sources_in_project(self, source_annotations: List[str] = None, max_workers: int = 3) -> List[Dict[str, Any]]:
         """
         分析项目中的所有源点
 
         Args:
             source_annotations: 搜索的注解列表，例如["@PostMapping", "@GetMapping"]
+            max_workers: 最大线程数
 
         Returns:
             所有分析结果的列表
@@ -50,7 +51,7 @@ class AnalysisService:
         print(f"📊 发现 {len(sources)} 个待分析的方法")
 
         # 批量分析
-        results = self.agent.analyze_sources(sources)
+        results = self.agent.analyze_sources(sources, max_workers=max_workers)
 
         return results
 
@@ -204,3 +205,25 @@ class AnalysisService:
                 print(f"处理Controller文件 {controller_file} 时出错: {e}")
 
         return controller_sources
+
+    def analyze_user_controllable_sources(self, max_workers: int = 3) -> List[Dict[str, Any]]:
+        """
+        分析所有用户可控的源点
+
+        Args:
+            max_workers: 最大线程数
+
+        Returns:
+            分析结果列表
+        """
+        print("🔍 搜索项目中所有潜在的用户输入源点...")
+        source_methods = self.find_user_controllable_sources()
+        print(f"📊 找到 {len(source_methods)} 个潜在源点")
+
+        if not source_methods:
+            print("⚠️ 未找到任何源点")
+            return []
+
+        print("⏳ 开始批量分析...")
+        results = self.agent.analyze_sources(source_methods, max_workers=max_workers)
+        return results

@@ -46,7 +46,12 @@ pip install tree-sitter tree-sitter-java
 
 #### 分析整个项目
 ```bash
+#默认三个线程
 python main.py --project /path/to/java/project
+
+
+# 指定5个线程
+python main.py --project /path/to/project --max-workers 5
 ```
 
 #### 分析指定方法
